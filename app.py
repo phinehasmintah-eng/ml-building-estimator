@@ -14,6 +14,8 @@ per the evaluation, improves on -- naive formula-based estimation.
 """
 
 import os
+import subprocess
+import sys
 
 import joblib
 import pandas as pd
@@ -21,9 +23,45 @@ from flask import Flask, render_template, request
 
 app = Flask(__name__)
 
-MODEL_DIR = os.path.join(os.path.dirname(__file__), "model")
-cost_model = joblib.load(os.path.join(MODEL_DIR, "model_total_cost_ghs.joblib"))
-cement_model = joblib.load(os.path.join(MODEL_DIR, "model_total_cement_bags.joblib"))
+BASE_DIR = os.path.dirname(__file__)
+MODEL_DIR = os.path.join(BASE_DIR, "model")
+DATA_DIR = os.path.join(BASE_DIR, "data")
+COST_MODEL_PATH = os.path.join(MODEL_DIR, "model_total_cost_ghs.joblib")
+CEMENT_MODEL_PATH = os.path.join(MODEL_DIR, "model_total_cement_bags.joblib")
+
+
+def ensure_models_are_usable():
+    """
+    Loads the saved models to confirm they're compatible with the library
+    versions actually installed in this environment. If the files are
+    missing OR were saved with different library versions (which raises an
+    error on load), regenerate the dataset and retrain the models fresh,
+    right here, so they always match. This makes the deployment
+    self-healing regardless of which Python/library versions the host
+    environment happens to install.
+    """
+    def _try_load():
+        joblib.load(COST_MODEL_PATH)
+        joblib.load(CEMENT_MODEL_PATH)
+
+    needs_training = not (os.path.exists(COST_MODEL_PATH) and os.path.exists(CEMENT_MODEL_PATH))
+    if not needs_training:
+        try:
+            _try_load()
+        except Exception as exc:  # noqa: BLE001 - any load failure means retrain
+            print(f"Saved models incompatible with this environment ({exc}); retraining...")
+            needs_training = True
+
+    if needs_training:
+        print("Training models in this environment...")
+        subprocess.run([sys.executable, "generate_dataset.py"], cwd=DATA_DIR, check=True)
+        subprocess.run([sys.executable, "train_models.py"], cwd=MODEL_DIR, check=True)
+        print("Training complete.")
+
+
+ensure_models_are_usable()
+cost_model = joblib.load(COST_MODEL_PATH)
+cement_model = joblib.load(CEMENT_MODEL_PATH)
 
 STRUCTURAL_TYPES = ["bungalow", "storey_building", "warehouse", "commercial_block"]
 WALL_MATERIALS = ["sandcrete_block", "clay_brick", "compressed_earth_block"]
@@ -119,4 +157,8 @@ def calculator():
 
 
 if __name__ == "__main__":
-    app.run(port=8000, debug=True)
+    # Local development only. On Railway, gunicorn (see Procfile) serves the
+    # app instead of this block, and Railway supplies the PORT it expects
+    # the app to listen on via the PORT environment variable.
+    port = int(os.environ.get("PORT", 8000))
+    app.run(host="0.0.0.0", port=port, debug=False)
