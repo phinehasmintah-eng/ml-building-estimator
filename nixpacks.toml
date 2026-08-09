@@ -1,4 +1,8 @@
 [phases.setup]
-nixPkgs = ["python311", "gcc"] 
+nixPkgs = ["python311", "gcc"]
+
+[phases.build]
+cmds = ["cd data && python generate_dataset.py && cd ../model && python train_models.py"]
+
 [start]
 cmd = "gunicorn app:app"
