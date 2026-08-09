@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ML Building Material & Cost Estimator</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+<div class="container">
+  <h1>Building Material &amp; Cost Estimator</h1>
+  <p class="subtitle">ML-powered estimation for Ghanaian construction projects</p>
+
+  <form method="POST">
+    <label for="floor_area">Floor area per storey (m&sup2;)</label>
+    <input type="number" step="0.01" min="1" id="floor_area" name="floor_area" value="{{ form_values.floor_area }}" required>
+
+    <label for="storeys">Number of storeys</label>
+    <select id="storeys" name="storeys">
+      {% for n in [1,2,3,4] %}
+      <option value="{{ n }}" {% if form_values.storeys == n|string %}selected{% endif %}>{{ n }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="structural_type">Structural type</label>
+    <select id="structural_type" name="structural_type">
+      {% for s in structural_types %}
+      <option value="{{ s }}" {% if form_values.structural_type == s %}selected{% endif %}>{{ s.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="wall_material">Wall material</label>
+    <select id="wall_material" name="wall_material">
+      {% for w in wall_materials %}
+      <option value="{{ w }}" {% if form_values.wall_material == w %}selected{% endif %}>{{ w.replace('_',' ')|title }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="region">Region</label>
+    <select id="region" name="region">
+      {% for r in regions %}
+      <option value="{{ r }}" {% if form_values.region == r %}selected{% endif %}>{{ r }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="finish_quality">Finish quality</label>
+    <select id="finish_quality" name="finish_quality">
+      {% for f in finish_qualities %}
+      <option value="{{ f }}" {% if form_values.finish_quality == f %}selected{% endif %}>{{ f|title }}</option>
+      {% endfor %}
+    </select>
+
+    <button type="submit">Estimate</button>
+  </form>
+
+  {% if results %}
+  <div class="results">
+    <h2>Results</h2>
+    <table>
+      <tr><th></th><th>ML Model (Gradient Boosting)</th><th>Deterministic formula</th></tr>
+      <tr><td>Estimated cement (bags)</td><td>{{ results.ml_cement_bags }}</td><td>{{ results.det_cement_bags }}</td></tr>
+      <tr><td>Estimated total cost (GHS)</td><td>{{ results.ml_cost }}</td><td>{{ results.det_cost }}</td></tr>
+    </table>
+    <p class="note">The ML model was trained on 6,000 synthesized project records and validated with
+    10-fold cross-validation, achieving ~9% mean absolute percentage error on held-out test data.
+    The deterministic column shows a fixed-formula estimate for comparison.</p>
+  </div>
+  {% endif %}
+</div>
+</body>
+</html>
